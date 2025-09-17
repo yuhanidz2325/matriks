@@ -1,3 +1,4 @@
+# Kode ini direvisi oleh tim inti.
 class Matrix:
     def __init__(self, data):
         self.data = data
