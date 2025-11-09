@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hasil Regresi Asuransi</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 30px 0;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 15px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+    
+    h1, h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+    }
+    
+    h1 {
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin-bottom: 30px;
+    }
+    
+    .metrics-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .metric-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      transition: transform 0.3s;
+    }
+    
+    .metric-card:hover {
+      transform: translateY(-5px);
+    }
+    
+    .metric-card h3 {
+      font-size: 1rem;
+      margin-bottom: 10px;
+      opacity: 0.9;
+      color: white;
+    }
+    
+    .metric-value {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    
+    .metric-label {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      margin-top: 5px;
+    }
+    
+    .table-container {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+      overflow-x: auto;
+    }
+    
+    .table {
+      margin-bottom: 0;
+    }
+    
+    .chart-container {
+      background: #f8f9fa;
+      padding: 25px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+    }
+    
+    .chart-wrapper {
+      position: relative;
+      height: 400px;
+    }
+    
+    .section-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .section-header h2 {
+      margin: 0;
+    }
+    
+    .badge-info {
+      background: #667eea;
+      color: white;
+      padding: 5px 15px;
+      border-radius: 20px;
+      margin-left: 15px;
+      font-size: 0.9rem;
+    }
+    
+    .text-warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 15px;
+      border-radius: 8px;
+      color: #856404;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Hasil Analisis Regresi Asuransi</h1>
+    
+    <!-- Metrics Cards -->
+    {% if metrics_values %}
+    <div class="metrics-cards">
+      <div class="metric-card">
+        <h3>📈 R² Score</h3>
+        <div class="metric-value">{{ "%.4f"|format(metrics_values.r2_score) }}</div>
+        <div class="metric-label">Goodness of Fit</div>
+      </div>
+      
+      <div class="metric-card">
+        <h3>📉 MSE</h3>
+        <div class="metric-value">{{ "{:,.2f}".format(metrics_values.mse) }}</div>
+        <div class="metric-label">Mean Squared Error</div>
+      </div>
+      
+      <div class="metric-card">
+        <h3>📊 RMSE</h3>
+        <div class="metric-value">{{ "{:,.2f}".format(metrics_values.rmse) }}</div>
+        <div class="metric-label">Root Mean Squared Error</div>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Metrics Table -->
+    <div class="section-header">
+      <h2>📋 Tabel Metrik Model</h2>
+      <span class="badge-info">results_metrics.csv</span>
+    </div>
+    <div class="table-container">
+      {{ metrics_table|safe }}
+    </div>
+    
+    <!-- Chart Visualization -->
+    {% if comparison_data %}
+    <div class="section-header">
+      <h2>📈 Visualisasi Prediksi vs Aktual</h2>
+      <span class="badge-info">{{ comparison_data|length }} data points</span>
+    </div>
+    <div class="chart-container">
+      <div class="chart-wrapper">
+        <canvas id="comparisonChart"></canvas>
+      </div>
+    </div>
+    
+    <div class="section-header">
+      <h2>🎯 Scatter Plot: Prediksi vs Aktual</h2>
+    </div>
+    <div class="chart-container">
+      <div class="chart-wrapper">
+        <canvas id="scatterChart"></canvas>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Results Table -->
+    <div class="section-header">
+      <h2>📄 Tabel Perbandingan (Actual vs Prediction)</h2>
+      <span class="badge-info">results.csv</span>
+    </div>
+    <div class="table-container">
+      {{ results_table|safe }}
+    </div>
+  </div>
+
+  <script>
+    // Data dari Flask
+    const comparisonData = {{ comparison_data|tojson }};
+    const metricsData = {{ metrics_data|tojson }};
+    
+    console.log('Comparison Data:', comparisonData);
+    console.log('Metrics Data:', metricsData);
+    
+    // Chart 1: Line Chart Comparison
+    if (comparisonData && comparisonData.length > 0) {
+      const ctx1 = document.getElementById('comparisonChart').getContext('2d');
+      
+      // Ambil kolom yang tersedia (asumsi: Actual dan Predicted)
+      const labels = comparisonData.map((_, idx) => idx + 1);
+      const actualKey = Object.keys(comparisonData[0]).find(k => k.toLowerCase().includes('actual'));
+      const predictedKey = Object.keys(comparisonData[0]).find(k => k.toLowerCase().includes('predict'));
+      
+      const actualValues = comparisonData.map(row => row[actualKey] || 0);
+      const predictedValues = comparisonData.map(row => row[predictedKey] || 0);
+      
+      new Chart(ctx1, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Actual',
+              data: actualValues,
+              borderColor: 'rgba(255, 99, 132, 1)',
+              backgroundColor: 'rgba(255, 99, 132, 0.1)',
+              borderWidth: 2,
+              pointRadius: 3,
+              tension: 0.1
+            },
+            {
+              label: 'Predicted',
+              data: predictedValues,
+              borderColor: 'rgba(102, 126, 234, 1)',
+              backgroundColor: 'rgba(102, 126, 234, 0.1)',
+              borderWidth: 2,
+              pointRadius: 3,
+              tension: 0.1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top'
+            },
+            title: {
+              display: true,
+              text: 'Perbandingan Nilai Aktual vs Prediksi',
+              font: {
+                size: 16,
+                weight: 'bold'
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Data Point Index'
+              }
+            },
+            y: {
+              title: {
+                display: true,
+                text: 'Charges ($)'
+              },
+              beginAtZero: false
+            }
+          }
+        }
+      });
+      
+      // Chart 2: Scatter Plot
+      const ctx2 = document.getElementById('scatterChart').getContext('2d');
+      
+      const scatterData = actualValues.map((actual, idx) => ({
+        x: actual,
+        y: predictedValues[idx]
+      }));
+      
+      // Calculate min and max for perfect prediction line
+      const allValues = [...actualValues, ...predictedValues];
+      const minVal = Math.min(...allValues);
+      const maxVal = Math.max(...allValues);
+      
+      new Chart(ctx2, {
+        type: 'scatter',
+        data: {
+          datasets: [
+            {
+              label: 'Actual vs Predicted',
+              data: scatterData,
+              backgroundColor: 'rgba(102, 126, 234, 0.6)',
+              borderColor: 'rgba(102, 126, 234, 1)',
+              pointRadius: 5,
+              pointHoverRadius: 7
+            },
+            {
+              label: 'Perfect Prediction Line',
+              data: [
+                { x: minVal, y: minVal },
+                { x: maxVal, y: maxVal }
+              ],
+              type: 'line',
+              borderColor: 'rgba(255, 99, 132, 1)',
+              borderWidth: 2,
+              pointRadius: 0,
+              fill: false,
+              borderDash: [5, 5]
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top'
+            },
+            title: {
+              display: true,
+              text: 'Scatter Plot: Actual vs Predicted Values',
+              font: {
+                size: 16,
+                weight: 'bold'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  if (context.datasetIndex === 0) {
+                    return `Actual: $${context.parsed.x.toFixed(2)}, Predicted: $${context.parsed.y.toFixed(2)}`;
+                  }
+                  return 'Perfect Prediction';
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Actual Charges ($)'
+              }
+            },
+            y: {
+              title: {
+                display: true,
+                text: 'Predicted Charges ($)'
+              }
+            }
+          }
+        }
+      });
+    }
+  </script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
