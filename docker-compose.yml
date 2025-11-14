@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  web:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: regression-linear-app
+    ports:
+      - "8000:8000"  # Port host:container (sesuaikan dengan app.py kamu)
+    volumes:
+      - .:/app  # Mount working directory (untuk development)
+    environment:
+      - FLASK_ENV=development  # development atau production
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    command: python app.py
+    
+  # (Opsional) Tambahkan service lain jika diperlukan
+  # Misalnya: database, redis, dll
